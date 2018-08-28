@@ -27,7 +27,8 @@ def cql_type(val):
         return val.cql_type
 
 def to_utf8(string):
-    return codecs.decode(string, 'utf-8')
+    return string
+    # return codecs.decode(string, 'utf-8')
 
 def log_quiet(msg):
     if not args.quiet:
@@ -65,12 +66,17 @@ def table_to_cqlfile(session, keyspace, tablename, flt, tableval, filep, limit=0
         return lambda v: session.encoder.cql_encode_all_types(v) if v is None else e(v)
 
     def make_value_encoders(tableval):
-        return dict((to_utf8(k), make_value_encoder(cql_type(v))) for k, v in tableval.columns.iteritems())
+        return dict((to_utf8(k), make_value_encoder(cql_type(v))) for k, v in tableval.columns.items())
 
     def make_row_encoder():
+        # print (tableval.columns.items())
+        # print ([(has_counter, columns) 
+                # for has_counter, columns in itertools.groupby(tableval.columns.items(), 
+                                                    # lambda v: cql_type(v) == 'counter')])
         partitions = dict(
             (has_counter, list(to_utf8(k) for k, v in columns))
-            for has_counter, columns in itertools.groupby(tableval.columns.iteritems(), lambda (k, v): cql_type(v) == 'counter')
+            for has_counter, columns in itertools.groupby(tableval.columns.items(), 
+                                                        lambda x: cql_type(x[1]) == 'counter')
         )
 
         keyspace_utf8 = to_utf8(keyspace)
@@ -105,7 +111,7 @@ def table_to_cqlfile(session, keyspace, tablename, flt, tableval, filep, limit=0
     row_encoder = make_row_encoder()
 
     for row in rows:
-        values = dict((to_utf8(k), to_utf8(value_encoders[k](v))) for k, v in row.iteritems())
+        values = dict((to_utf8(k), to_utf8(value_encoders[k](v))) for k, v in row.items())
         filep.write("%s;\n" % row_encoder(values))
 
         cnt += 1
@@ -236,7 +242,7 @@ def export_data(session):
                 f.write('DROP KEYSPACE IF EXISTS "' + keyname + '";\n')
                 f.write(keyspace.export_as_string() + '\n')
 
-            for tablename, tableval in keyspace.tables.iteritems():
+            for tablename, tableval in keyspace.tables.items():
                 if tablename in exclude_list:
                     log_quiet('Skipping data export for column family ' + keyname + '.' + tablename + '\n')
                     continue
